@@ -1,0 +1,31 @@
+{
+  "name": "awstest",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.744.0",
+    "@aws-sdk/lib-storage": "^3.744.0",
+    "@prisma/client": "^6.3.1",
+    "aws-sdk": "^2.1692.0",
+    "axios": "^1.7.9",
+    "bcrypt": "^5.1.1",
+    "cookie": "^1.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "next": "15.1.4",
+    "next-connect": "^1.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "postcss": "^8",
+    "prisma": "^6.3.1",
+    "tailwindcss": "^3.4.1"
+  }
+}
