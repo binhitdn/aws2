@@ -1,5 +1,5 @@
-import prisma from '../../../lib/prisma';
-import { getS3FileUrl } from '../../../lib/aws';
+import prisma from '../../../../lib/prisma';
+import { getS3FileUrl } from '../../../../lib/aws';
 
 export default async function handler(req, res) {
   const { id } = req.query;

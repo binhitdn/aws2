@@ -27,3 +27,17 @@ export const uploadToS3 = async (file) => {
     throw new Error(`Lỗi khi tải lên S3: ${error.message}`);
   }
 };
+
+
+export async function getS3FileUrl(fileKey) {
+  if (!fileKey) {
+    throw new Error('Invalid fileKey');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET_NAME,
+    Key: fileKey,
+  });
+
+  return getSignedUrl(s3, command, { expiresIn: 3600 }); // URL có hiệu lực trong 1 giờ
+}

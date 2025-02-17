@@ -1,4 +1,3 @@
-// pages/index.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import withAuth from '@/hoc/withAuth';
@@ -72,7 +71,6 @@ const DashBoard = () => {
       const data = await res.json();
       if (res.ok) {
         alert('File uploaded successfully');
-        // Cập nhật danh sách tài liệu sau khi upload thành công
         setDocuments((prev) => [...prev, data.document]);
         setTitle('');
         setDescription('');
@@ -104,14 +102,23 @@ const DashBoard = () => {
     }
   };
 
-  const handleDownload = async (fileUrl) => {
-  if (!fileUrl || !fileUrl.startsWith('http')) {
-    alert('Lỗi: URL không hợp lệ');
+ const handleDownload = async (documentId) => {
+  if (!documentId || typeof documentId !== 'number') {
+    console.error('❌ documentId không hợp lệ:', documentId);
+    alert('Lỗi: ID tài liệu không hợp lệ');
     return;
   }
 
   try {
-    const response = await fetch(fileUrl);
+    const res = await fetch(`/api/documents/download/${documentId}`);
+    if (!res.ok) throw new Error('Lỗi khi lấy link tải xuống');
+
+    const data = await res.json();
+    if (!data.downloadUrl) throw new Error('Không nhận được URL tải xuống');
+
+    console.log('🔗 Download URL:', data.downloadUrl);
+
+    const response = await fetch(data.downloadUrl);
     if (!response.ok) throw new Error('Lỗi khi tải file');
 
     const blob = await response.blob();
@@ -119,7 +126,7 @@ const DashBoard = () => {
     const a = document.createElement('a');
 
     a.href = url;
-    a.download = fileUrl.split('/').pop(); // Lấy tên file từ URL
+    a.download = data.downloadUrl.split('/').pop(); // Lấy tên file từ URL
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -129,6 +136,8 @@ const DashBoard = () => {
     alert('Tải xuống thất bại');
   }
 };
+
+
 
 
   const handleLogout = () => {
@@ -210,12 +219,14 @@ const DashBoard = () => {
                 <h3 className="text-xl font-semibold">{doc.title}</h3>
                 <p className="mt-2">{doc.description}</p>
                 <div className="mt-4 space-x-2">
-                  <button
-                    onClick={() => handleDownload(doc.fileUrl)}
-                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                  >
-                    Download
-                  </button>
+                 <button
+  onClick={() => handleDownload(doc.id)}
+  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+>
+  
+  Download
+</button>
+
                   <button
                     onClick={() => handleDelete(doc.id)}
                     className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
