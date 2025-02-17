@@ -33,21 +33,21 @@ const handler = async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    // Upload file lên S3
-    const fileUrl = await uploadToS3(req.file);
+    // Upload file lên S3 và nhận được file key
+    const fileKey = await uploadToS3(req.file);
 
     // Kiểm tra req.body có được parse đúng không
     if (!req.body.title || !req.body.description || !req.body.userId) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Lưu thông tin tài liệu vào database (Prisma)
+    // Lưu thông tin tài liệu vào database (Prisma) với fileUrl là file key
     const document = await prisma.document.create({
       data: {
         title: req.body.title,
         description: req.body.description,
-        fileUrl: fileUrl,
-        userId: parseInt(req.body.userId, 10), // Chuyển userId thành số
+        fileUrl: fileKey, // Lưu key (ví dụ: uploads/1739766353197-BÃ¹i Minh Äá»©c_Äa ná»n táº£ng.docx)
+        userId: parseInt(req.body.userId, 10),
       },
     });
 
