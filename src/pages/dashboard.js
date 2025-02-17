@@ -12,6 +12,7 @@ const DashBoard = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [user, setUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Các state cho chức năng chỉnh sửa tài liệu
   const [editingDocumentId, setEditingDocumentId] = useState(null);
@@ -71,8 +72,6 @@ const DashBoard = () => {
       alert('Vui lòng chọn file để upload');
       return;
     }
-    console.log('Uploading file:', file);
-
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', title);
@@ -121,34 +120,21 @@ const DashBoard = () => {
 
   const handleDownload = async (documentId) => {
     try {
-      // Bước 1: Gọi API backend để lấy signed URL (downloadUrl)
+      // Lấy signed URL từ backend
       const res = await axios.get(`/api/documents/download/${documentId}`);
       let { downloadUrl } = res.data;
       if (!downloadUrl) {
         throw new Error('Không nhận được URL tải xuống');
       }
-      console.log('🔗 Download URL (raw):', downloadUrl);
-
-      // Sửa lỗi URL bị lặp: nếu downloadUrl chứa "https%3A", decode và trích xuất file key
       const s3Prefix = "https://casestudy-001.s3.ap-southeast-1.amazonaws.com/";
       if (downloadUrl.includes("https%3A")) {
         const decoded = decodeURIComponent(downloadUrl);
         const index = decoded.indexOf("uploads/");
-        if (index !== -1) {
-          downloadUrl = s3Prefix + decoded.substring(index);
-        } else {
-          downloadUrl = decoded;
-        }
+        downloadUrl = index !== -1 ? s3Prefix + decoded.substring(index) : decoded;
       }
-      console.log('🔗 Download URL (fixed):', downloadUrl);
-
-      // Bước 2: Gọi axios để tải file dạng blob
+      // Tải file dạng blob
       const fileResponse = await axios.get(downloadUrl, { responseType: 'blob' });
-      if (!fileResponse.data) {
-        throw new Error('Không tải được file');
-      }
-
-      // Bước 3: Tạo URL tạm và tải file
+      if (!fileResponse.data) throw new Error('Không tải được file');
       const blob = fileResponse.data;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -164,21 +150,18 @@ const DashBoard = () => {
     }
   };
 
-  // Hàm bắt đầu chỉnh sửa document
   const startEditing = (doc) => {
     setEditingDocumentId(doc.id);
     setEditTitle(doc.title);
     setEditDescription(doc.description);
   };
 
-  // Hàm hủy chỉnh sửa
   const cancelEditing = () => {
     setEditingDocumentId(null);
     setEditTitle('');
     setEditDescription('');
   };
 
-  // Hàm cập nhật document
   const handleUpdate = async (id) => {
     try {
       const res = await fetch(`/api/documents/${id}`, {
@@ -204,27 +187,19 @@ const DashBoard = () => {
     }
   };
 
-  // Hàm xem trước tài liệu (Preview)
   const handlePreview = async (doc) => {
     try {
       const res = await fetch(`/api/documents/download/${doc.id}`);
       if (!res.ok) throw new Error('Lỗi khi lấy link preview');
       const data = await res.json();
-      console.log("Response từ API:", data); // Debug log
-
       if (!data.downloadUrl || typeof data.downloadUrl !== 'string') {
         throw new Error('Không nhận được URL preview hợp lệ');
       }
-      // Sửa URL nếu cần
       let previewUrlFixed = data.downloadUrl;
       if (previewUrlFixed.includes("https%3A")) {
         const decoded = decodeURIComponent(previewUrlFixed);
         const index = decoded.indexOf("uploads/");
-        if (index !== -1) {
-          previewUrlFixed = "https://casestudy-001.s3.ap-southeast-1.amazonaws.com/" + decoded.substring(index);
-        } else {
-          previewUrlFixed = decoded;
-        }
+        previewUrlFixed = index !== -1 ? "https://casestudy-001.s3.ap-southeast-1.amazonaws.com/" + decoded.substring(index) : decoded;
       }
       setDocPreviewUrl(previewUrlFixed);
       setIsModalOpen(true);
@@ -234,7 +209,6 @@ const DashBoard = () => {
     }
   };
 
-  // Cải tiến chức năng đăng xuất
   const handleLogout = async () => {
     try {
       await fetch('/api/logout', { method: 'POST' });
@@ -245,159 +219,150 @@ const DashBoard = () => {
     router.replace('/login');
   };
 
-  if (!user) {
-    return <p className="text-center mt-10">Loading...</p>;
-  }
+  // Lọc tài liệu theo từ khóa tìm kiếm
+  const filteredDocuments = documents.filter((doc) =>
+    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
-      <nav className="bg-white shadow p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
-        >
-          Logout
-        </button>
-      </nav>
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-blue-600">Drive</h1>
+          <div className="flex items-center space-x-4">
+            <input
+              type="text"
+              placeholder="Tìm kiếm tài liệu..."
+              className="border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring focus:border-blue-300"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
+            >
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+      </header>
 
-      {/* Profile */}
-      <div className="max-w-3xl mx-auto mt-6 bg-white p-6 rounded shadow">
-        <h2 className="text-2xl font-bold mb-4">Profile</h2>
-        <p>
-          <strong>Name:</strong> {user.name}
-        </p>
-        <p className="mt-2">
-          <strong>Email:</strong> {user.email}
-        </p>
-      </div>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Profile & Upload */}
+        <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Profile Card */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-semibold mb-4">Thông tin cá nhân</h2>
+            {user ? (
+              <div>
+                <p>
+                  <span className="font-medium">Tên:</span> {user.name}
+                </p>
+                <p className="mt-2">
+                  <span className="font-medium">Email:</span> {user.email}
+                </p>
+              </div>
+            ) : (
+              <p>Loading...</p>
+            )}
+          </div>
+          {/* Upload Form */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-semibold mb-4">Upload Tài liệu</h2>
+            <form onSubmit={handleUpload} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Tiêu đề"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
+              />
+              <input
+                type="text"
+                placeholder="Mô tả"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
+              />
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border-0 file:rounded-full file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {previewUrl && (
+                <div className="mb-2">
+                  <p className="font-medium">Preview:</p>
+                  <img src={previewUrl} alt="Preview" className="max-w-xs rounded shadow" />
+                </div>
+              )}
+              <button
+                type="submit"
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
+              >
+                Upload
+              </button>
+            </form>
+          </div>
+        </section>
 
-      {/* Form Upload */}
-      <div className="max-w-3xl mx-auto mt-6 bg-white p-6 rounded shadow">
-        <h2 className="text-2xl font-bold mb-4">Upload New Document</h2>
-        <form onSubmit={handleUpload}>
-          <input
-            type="text"
-            placeholder="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded mb-4"
-          />
-          <input
-            type="text"
-            placeholder="Description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded mb-4"
-          />
-          <input
-            type="file"
-            onChange={handleFileChange}
-            className="w-full p-2 border border-gray-300 rounded mb-4"
-          />
-          {previewUrl && (
-            <div className="mb-4">
-              <p className="font-medium">Preview:</p>
-              <img src={previewUrl} alt="Preview" className="max-w-xs rounded shadow" />
+        {/* Danh sách tài liệu */}
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Tài liệu của tôi</h2>
+          {filteredDocuments.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {filteredDocuments.map((doc) => (
+                <div key={doc.id} className="bg-white rounded-lg shadow hover:shadow-lg transition p-4 flex flex-col">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-1">{doc.title}</h3>
+                    <p className="text-sm text-gray-600 line-clamp-2">{doc.description}</p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handlePreview(doc)}
+                      className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs px-3 py-1 rounded transition"
+                    >
+                      Xem trước
+                    </button>
+                    <button
+                      onClick={() => handleDownload(doc.id)}
+                      className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded transition"
+                    >
+                      Tải xuống
+                    </button>
+                    <button
+                      onClick={() => startEditing(doc)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1 rounded transition"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      onClick={() => handleDelete(doc.id)}
+                      className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <p className="text-gray-500">Chưa có tài liệu nào được upload.</p>
           )}
-          <button
-            type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
-          >
-            Upload
-          </button>
-        </form>
-      </div>
-
-      {/* Danh sách tài liệu */}
-      <div className="max-w-3xl mx-auto mt-6 bg-white p-6 rounded shadow">
-        <h2 className="text-2xl font-bold mb-4">Uploaded Documents</h2>
-        {documents.length > 0 ? (
-          <ul>
-            {documents.map((doc) => (
-              <li key={doc.id} className="border-b border-gray-200 py-4">
-                {editingDocumentId === doc.id ? (
-                  <div>
-                    <input
-                      type="text"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded mb-2"
-                    />
-                    <input
-                      type="text"
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded mb-2"
-                    />
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleUpdate(doc.id)}
-                        className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={cancelEditing}
-                        className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="text-xl font-semibold">{doc.title}</h3>
-                    <p className="mt-2">{doc.description}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        onClick={() => handlePreview(doc)}
-                        className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 transition"
-                      >
-                        Preview
-                      </button>
-                      <button
-                        onClick={() => handleDownload(doc.id)}
-                        className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
-                      >
-                        Download
-                      </button>
-                      <button
-                        onClick={() => startEditing(doc)}
-                        className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(doc.id)}
-                        className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500">Chưa có tài liệu nào được upload.</p>
-        )}
-      </div>
+        </section>
+      </main>
 
       {/* Modal xem trước tài liệu */}
       {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg relative max-w-3xl w-full mx-4">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+          <div className="bg-white rounded-lg shadow-lg relative max-w-3xl w-full mx-4">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 text-red-500 font-bold text-xl"
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-3xl"
             >
               &times;
             </button>
-            <div className="mt-4">
+            <div className="p-6">
               {typeof docPreviewUrl === 'string' && docPreviewUrl.length > 0 ? (
                 (() => {
                   const ext = docPreviewUrl.split('.').pop().split(/\#|\?/)[0].toLowerCase();
@@ -409,7 +374,6 @@ const DashBoard = () => {
                     return (
                       <div className="flex flex-col items-center justify-center p-6">
                         <div className="mb-4">
-                          {/* Icon file (SVG) */}
                           <svg
                             className="w-16 h-16 text-gray-500"
                             fill="none"
@@ -444,6 +408,6 @@ const DashBoard = () => {
       )}
     </div>
   );
-}
+};
 
 export default withAuth(DashBoard);
