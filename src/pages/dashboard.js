@@ -2,12 +2,18 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import withAuth from '@/hoc/withAuth';
 import axios from '../lib/axios';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ClipLoader } from 'react-spinners';
+import mammoth from 'mammoth';
 
 const DashBoard = () => {
   const [documents, setDocuments] = useState([]);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(''); // Preview file khi upload
-  const [docPreviewUrl, setDocPreviewUrl] = useState(''); // Preview tài liệu từ danh sách
+  const [docPreviewUrl, setDocPreviewUrl] = useState(''); // Preview tài liệu từ danh sách (non-DOCX)
+  const [docxPreviewHtml, setDocxPreviewHtml] = useState(''); // HTML convert từ DOCX
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false); // Loading preview
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -34,6 +40,7 @@ const DashBoard = () => {
       setUser(data.user);
     } catch (err) {
       console.error('Lỗi lấy thông tin user:', err);
+      toast.error('Lỗi lấy thông tin user');
     }
   };
 
@@ -50,6 +57,7 @@ const DashBoard = () => {
     } catch (error) {
       console.error('Lỗi fetch documents:', error);
       setDocuments([]);
+      toast.error('Lỗi fetch documents');
     }
   };
 
@@ -69,7 +77,7 @@ const DashBoard = () => {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file) {
-      alert('Vui lòng chọn file để upload');
+      toast.error('Vui lòng chọn file để upload');
       return;
     }
     const formData = new FormData();
@@ -85,18 +93,18 @@ const DashBoard = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('File uploaded successfully');
+        toast.success('File uploaded successfully');
         setDocuments((prev) => [...prev, data.document]);
         setTitle('');
         setDescription('');
         setFile(null);
         setPreviewUrl('');
       } else {
-        alert(data.message || 'Upload thất bại');
+        toast.error(data.message || 'Upload thất bại');
       }
     } catch (error) {
       console.error('Lỗi upload:', error);
-      alert('Upload thất bại');
+      toast.error('Upload thất bại');
     }
   };
 
@@ -107,14 +115,14 @@ const DashBoard = () => {
         method: 'DELETE',
       });
       if (res.ok) {
-        alert('Document deleted successfully');
+        toast.success('Document deleted successfully');
         setDocuments((prev) => prev.filter((doc) => doc.id !== id));
       } else {
-        alert('Xóa tài liệu thất bại');
+        toast.error('Xóa tài liệu thất bại');
       }
     } catch (error) {
       console.error('Lỗi xóa document:', error);
-      alert('Xóa tài liệu thất bại');
+      toast.error('Xóa tài liệu thất bại');
     }
   };
 
@@ -146,7 +154,7 @@ const DashBoard = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('❌ Lỗi download:', error);
-      alert('Tải xuống thất bại');
+      toast.error('Tải xuống thất bại');
     }
   };
 
@@ -171,7 +179,7 @@ const DashBoard = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Document updated successfully');
+        toast.success('Document updated successfully');
         setDocuments((prev) =>
           prev.map((doc) =>
             doc.id === id ? { ...doc, title: editTitle, description: editDescription } : doc
@@ -179,14 +187,15 @@ const DashBoard = () => {
         );
         cancelEditing();
       } else {
-        alert(data.message || 'Cập nhật thất bại');
+        toast.error(data.message || 'Cập nhật thất bại');
       }
     } catch (error) {
       console.error('Lỗi cập nhật document:', error);
-      alert('Cập nhật thất bại');
+      toast.error('Cập nhật thất bại');
     }
   };
 
+  // Hàm xử lý preview file, hỗ trợ cả DOCX
   const handlePreview = async (doc) => {
     try {
       const res = await fetch(`/api/documents/download/${doc.id}`);
@@ -199,13 +208,29 @@ const DashBoard = () => {
       if (previewUrlFixed.includes("https%3A")) {
         const decoded = decodeURIComponent(previewUrlFixed);
         const index = decoded.indexOf("uploads/");
-        previewUrlFixed = index !== -1 ? "https://casestudy-001.s3.ap-southeast-1.amazonaws.com/" + decoded.substring(index) : decoded;
+        previewUrlFixed =
+          index !== -1
+            ? "https://casestudy-001.s3.ap-southeast-1.amazonaws.com/" + decoded.substring(index)
+            : decoded;
       }
-      setDocPreviewUrl(previewUrlFixed);
+
+      const ext = previewUrlFixed.split('.').pop().split(/\#|\?/)[0].toLowerCase();
+      if (ext === 'docx') {
+        setIsPreviewLoading(true);
+        // Fetch file dưới dạng arraybuffer và convert DOCX sang HTML
+        const fileResponse = await axios.get(previewUrlFixed, { responseType: 'arraybuffer' });
+        const result = await mammoth.convertToHtml({ arrayBuffer: fileResponse.data });
+        setDocxPreviewHtml(result.value);
+        setIsPreviewLoading(false);
+        setDocPreviewUrl(''); // clear URL preview thông thường
+      } else {
+        setDocPreviewUrl(previewUrlFixed);
+        setDocxPreviewHtml('');
+      }
       setIsModalOpen(true);
     } catch (error) {
       console.error('Lỗi preview:', error);
-      alert('Không thể xem trước tài liệu');
+      toast.error('Không thể xem trước tài liệu');
     }
   };
 
@@ -214,6 +239,7 @@ const DashBoard = () => {
       await fetch('/api/logout', { method: 'POST' });
     } catch (error) {
       console.error('Lỗi đăng xuất:', error);
+      toast.error('Lỗi đăng xuất');
     }
     localStorage.removeItem('token');
     router.replace('/login');
@@ -226,6 +252,7 @@ const DashBoard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ToastContainer position="top-right" autoClose={3000} />
       {/* Navbar */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -363,7 +390,13 @@ const DashBoard = () => {
               &times;
             </button>
             <div className="p-6">
-              {typeof docPreviewUrl === 'string' && docPreviewUrl.length > 0 ? (
+              {isPreviewLoading ? (
+                <div className="flex justify-center items-center h-96">
+                  <ClipLoader color="#123abc" size={50} />
+                </div>
+              ) : docxPreviewHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: docxPreviewHtml }} />
+              ) : docPreviewUrl ? (
                 (() => {
                   const ext = docPreviewUrl.split('.').pop().split(/\#|\?/)[0].toLowerCase();
                   if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
