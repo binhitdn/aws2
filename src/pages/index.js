@@ -23,7 +23,7 @@ export default function Home() {
     };
 
     checkAuth();
-  }, [router]);
+  }, []);
 
   if (loading) {
     return <p className="text-center mt-10">Loading...</p>;

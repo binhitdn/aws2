@@ -1,8 +1,9 @@
 // pages/index.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import withAuth from '@/hoc/withAuth';
 
-export default function HomePage() {
+const DashBoard = () => {
   const [documents, setDocuments] = useState([]);
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -12,13 +13,12 @@ export default function HomePage() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
+    fetchUser();
+    fetchDocuments();
+  }, []);
 
-    // Fetch thông tin user
-    const fetchUser = async () => {
+
+  const fetchUser = async () => {
       try {
         const res = await fetch('/api/profile');
         if (!res.ok) throw new Error('Profile error');
@@ -26,7 +26,7 @@ export default function HomePage() {
         setUser(data.user);
       } catch (err) {
         console.error('Lỗi lấy thông tin user:', err);
-        router.push('/login');
+        
       }
     };
 
@@ -47,9 +47,6 @@ export default function HomePage() {
       }
     };
 
-    fetchUser();
-    fetchDocuments();
-  }, [router]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -107,9 +104,32 @@ export default function HomePage() {
     }
   };
 
-  const handleDownload = (fileUrl) => {
-    window.location.href = fileUrl;
-  };
+  const handleDownload = async (fileUrl) => {
+  if (!fileUrl || !fileUrl.startsWith('http')) {
+    alert('Lỗi: URL không hợp lệ');
+    return;
+  }
+
+  try {
+    const response = await fetch(fileUrl);
+    if (!response.ok) throw new Error('Lỗi khi tải file');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+
+    a.href = url;
+    a.download = fileUrl.split('/').pop(); // Lấy tên file từ URL
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('❌ Lỗi download:', error);
+    alert('Tải xuống thất bại');
+  }
+};
+
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -213,3 +233,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+export default withAuth(DashBoard);

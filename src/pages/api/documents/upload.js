@@ -1,28 +1,61 @@
-// pages/api/documents/upload.js
-import { createRouter } from 'next-connect';
 import multer from 'multer';
-import { uploadToS3 } from '../../../lib/aws'; // Đảm bảo bạn đã cấu hình AWS S3
-import prisma from '../../../lib/prisma'; // Đảm bảo bạn đã cấu hình Prisma
+import { uploadToS3 } from '../../../lib/aws';
+import prisma from '../../../lib/prisma';
 
-// Tắt body parser mặc định của Next.js để multer có thể xử lý
+// Cấu hình multer để lưu file trong bộ nhớ
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// Middleware xử lý file upload
+const uploadMiddleware = upload.single('file');
+
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: false, // Tắt bodyParser mặc định
   },
 };
 
-// Cấu hình multer để lưu trữ tạm thời trong bộ nhớ
-const upload = multer({
-  storage: multer.memoryStorage(),
-});
+const handler = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
 
-// Tạo router với next-connect (phiên bản 1.0)
-const router = createRouter();
+  try {
+    // Bọc multer bằng Promise để tránh lỗi callback
+    await new Promise((resolve, reject) => {
+      uploadMiddleware(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
 
-// Sử dụng middleware multer để xử lý file upload
-router.use(upload.single('file')); // 'file' là tên field trong form upload
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
 
-// Định nghĩa phương thức POST
+    // Upload file lên S3
+    const fileUrl = await uploadToS3(req.file);
 
+    // Kiểm tra req.body có được parse đúng không
+    if (!req.body.title || !req.body.description || !req.body.userId) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-export default router.handler();
+    // Lưu thông tin tài liệu vào database (Prisma)
+    const document = await prisma.document.create({
+      data: {
+        title: req.body.title,
+        description: req.body.description,
+        fileUrl: fileUrl,
+        userId: parseInt(req.body.userId, 10), // Chuyển userId thành số
+      },
+    });
+
+    res.status(200).json({ message: 'File uploaded successfully', document });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Error uploading file', error: error.message });
+  }
+};
+
+export default handler;
