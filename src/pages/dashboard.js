@@ -5,22 +5,21 @@ import axios from '../lib/axios';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { ClipLoader } from 'react-spinners';
-import mammoth from 'mammoth';
 
 const DashBoard = () => {
   const [documents, setDocuments] = useState([]);
   const [file, setFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(''); // Preview file khi upload
-  const [docPreviewUrl, setDocPreviewUrl] = useState(''); // Preview tài liệu từ danh sách (non-DOCX)
-  const [docxPreviewHtml, setDocxPreviewHtml] = useState(''); // HTML convert từ DOCX
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false); // Loading preview
+  const [previewUrl, setPreviewUrl] = useState(''); 
+  const [docPreviewUrl, setDocPreviewUrl] = useState(''); 
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false); 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOfficeModalOpen, setIsOfficeModalOpen] = useState(false); 
+  const [officeEditUrl, setOfficeEditUrl] = useState(''); 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Các state cho chức năng chỉnh sửa tài liệu
   const [editingDocumentId, setEditingDocumentId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -39,8 +38,8 @@ const DashBoard = () => {
       const data = await res.json();
       setUser(data.user);
     } catch (err) {
-      console.error('Lỗi lấy thông tin user:', err);
-      toast.error('Lỗi lấy thông tin user');
+      console.error('Error fetching user info:', err);
+      toast.error('Error fetching user info');
     }
   };
 
@@ -51,17 +50,16 @@ const DashBoard = () => {
       if (Array.isArray(data)) {
         setDocuments(data);
       } else {
-        console.warn('Dữ liệu trả về không phải mảng:', data);
+        console.warn('Returned data is not an array:', data);
         setDocuments([]);
       }
     } catch (error) {
-      console.error('Lỗi fetch documents:', error);
+      console.error('Error fetching documents:', error);
       setDocuments([]);
-      toast.error('Lỗi fetch documents');
+      toast.error('Error fetching documents');
     }
   };
 
-  // Xử lý thay đổi file: tạo preview nếu file là image
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -77,7 +75,7 @@ const DashBoard = () => {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file) {
-      toast.error('Vui lòng chọn file để upload');
+      toast.error('Please select a file to upload');
       return;
     }
     const formData = new FormData();
@@ -100,16 +98,16 @@ const DashBoard = () => {
         setFile(null);
         setPreviewUrl('');
       } else {
-        toast.error(data.message || 'Upload thất bại');
+        toast.error(data.message || 'Upload failed');
       }
     } catch (error) {
-      console.error('Lỗi upload:', error);
-      toast.error('Upload thất bại');
+      console.error('Upload error:', error);
+      toast.error('Upload failed');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Bạn có chắc muốn xóa tài liệu này không?')) return;
+    if (!confirm('Are you sure you want to delete this document?')) return;
     try {
       const res = await fetch(`/api/documents/${id}`, {
         method: 'DELETE',
@@ -118,21 +116,21 @@ const DashBoard = () => {
         toast.success('Document deleted successfully');
         setDocuments((prev) => prev.filter((doc) => doc.id !== id));
       } else {
-        toast.error('Xóa tài liệu thất bại');
+        toast.error('Failed to delete document');
       }
     } catch (error) {
-      console.error('Lỗi xóa document:', error);
-      toast.error('Xóa tài liệu thất bại');
+      console.error('Error deleting document:', error);
+      toast.error('Failed to delete document');
     }
   };
 
   const handleDownload = async (documentId) => {
     try {
-      // Lấy signed URL từ backend
+
       const res = await axios.get(`/api/documents/download/${documentId}`);
       let { downloadUrl } = res.data;
       if (!downloadUrl) {
-        throw new Error('Không nhận được URL tải xuống');
+        throw new Error('Did not receive a download URL');
       }
       const s3Prefix = "https://casestudy-001.s3.ap-southeast-1.amazonaws.com/";
       if (downloadUrl.includes("https%3A")) {
@@ -140,9 +138,9 @@ const DashBoard = () => {
         const index = decoded.indexOf("uploads/");
         downloadUrl = index !== -1 ? s3Prefix + decoded.substring(index) : decoded;
       }
-      // Tải file dạng blob
+
       const fileResponse = await axios.get(downloadUrl, { responseType: 'blob' });
-      if (!fileResponse.data) throw new Error('Không tải được file');
+      if (!fileResponse.data) throw new Error('Unable to download file');
       const blob = fileResponse.data;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -153,8 +151,8 @@ const DashBoard = () => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('❌ Lỗi download:', error);
-      toast.error('Tải xuống thất bại');
+      console.error('Download error:', error);
+      toast.error('Download failed');
     }
   };
 
@@ -187,22 +185,21 @@ const DashBoard = () => {
         );
         cancelEditing();
       } else {
-        toast.error(data.message || 'Cập nhật thất bại');
+        toast.error(data.message || 'Update failed');
       }
     } catch (error) {
-      console.error('Lỗi cập nhật document:', error);
-      toast.error('Cập nhật thất bại');
+      console.error('Error updating document:', error);
+      toast.error('Update failed');
     }
   };
 
-  // Hàm xử lý preview file, hỗ trợ cả DOCX
   const handlePreview = async (doc) => {
     try {
       const res = await fetch(`/api/documents/download/${doc.id}`);
-      if (!res.ok) throw new Error('Lỗi khi lấy link preview');
+      if (!res.ok) throw new Error('Error retrieving preview URL');
       const data = await res.json();
       if (!data.downloadUrl || typeof data.downloadUrl !== 'string') {
-        throw new Error('Không nhận được URL preview hợp lệ');
+        throw new Error('Invalid preview URL');
       }
       let previewUrlFixed = data.downloadUrl;
       if (previewUrlFixed.includes("https%3A")) {
@@ -215,22 +212,13 @@ const DashBoard = () => {
       }
 
       const ext = previewUrlFixed.split('.').pop().split(/\#|\?/)[0].toLowerCase();
-      if (ext === 'docx') {
-        setIsPreviewLoading(true);
-        // Fetch file dưới dạng arraybuffer và convert DOCX sang HTML
-        const fileResponse = await axios.get(previewUrlFixed, { responseType: 'arraybuffer' });
-        const result = await mammoth.convertToHtml({ arrayBuffer: fileResponse.data });
-        setDocxPreviewHtml(result.value);
-        setIsPreviewLoading(false);
-        setDocPreviewUrl(''); // clear URL preview thông thường
-      } else {
+
         setDocPreviewUrl(previewUrlFixed);
-        setDocxPreviewHtml('');
-      }
+
       setIsModalOpen(true);
     } catch (error) {
-      console.error('Lỗi preview:', error);
-      toast.error('Không thể xem trước tài liệu');
+      console.error('Preview error:', error);
+      toast.error('Unable to preview document');
     }
   };
 
@@ -238,14 +226,13 @@ const DashBoard = () => {
     try {
       await fetch('/api/logout', { method: 'POST' });
     } catch (error) {
-      console.error('Lỗi đăng xuất:', error);
-      toast.error('Lỗi đăng xuất');
+      console.error('Logout error:', error);
+      toast.error('Logout error');
     }
     localStorage.removeItem('token');
     router.replace('/login');
   };
 
-  // Lọc tài liệu theo từ khóa tìm kiếm
   const filteredDocuments = documents.filter((doc) =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -253,14 +240,14 @@ const DashBoard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <ToastContainer position="top-right" autoClose={3000} />
-      {/* Navbar */}
+      {}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-blue-600">Drive</h1>
           <div className="flex items-center space-x-4">
             <input
               type="text"
-              placeholder="Tìm kiếm tài liệu..."
+              placeholder="Search documents..."
               className="border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring focus:border-blue-300"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -269,22 +256,22 @@ const DashBoard = () => {
               onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition"
             >
-              Đăng xuất
+              Logout
             </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Profile & Upload */}
+        {}
         <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Profile Card */}
+          {}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-2xl font-semibold mb-4">Thông tin cá nhân</h2>
+            <h2 className="text-2xl font-semibold mb-4">Profile</h2>
             {user ? (
               <div>
                 <p>
-                  <span className="font-medium">Tên:</span> {user.name}
+                  <span className="font-medium">Name:</span> {user.name}
                 </p>
                 <p className="mt-2">
                   <span className="font-medium">Email:</span> {user.email}
@@ -294,20 +281,20 @@ const DashBoard = () => {
               <p>Loading...</p>
             )}
           </div>
-          {/* Upload Form */}
+          {}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-2xl font-semibold mb-4">Upload Tài liệu</h2>
+            <h2 className="text-2xl font-semibold mb-4">Upload Document</h2>
             <form onSubmit={handleUpload} className="space-y-4">
               <input
                 type="text"
-                placeholder="Tiêu đề"
+                placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
               />
               <input
                 type="text"
-                placeholder="Mô tả"
+                placeholder="Description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
@@ -333,9 +320,9 @@ const DashBoard = () => {
           </div>
         </section>
 
-        {/* Danh sách tài liệu */}
+        {}
         <section>
-          <h2 className="text-2xl font-semibold mb-4">Tài liệu của tôi</h2>
+          <h2 className="text-2xl font-semibold mb-4">My Documents</h2>
           {filteredDocuments.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredDocuments.map((doc) => (
@@ -349,37 +336,38 @@ const DashBoard = () => {
                       onClick={() => handlePreview(doc)}
                       className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs px-3 py-1 rounded transition"
                     >
-                      Xem trước
+                      Preview
                     </button>
                     <button
                       onClick={() => handleDownload(doc.id)}
                       className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded transition"
                     >
-                      Tải xuống
+                      Download
                     </button>
                     <button
                       onClick={() => startEditing(doc)}
                       className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1 rounded transition"
                     >
-                      Sửa
+                      Edit Info
                     </button>
+
                     <button
                       onClick={() => handleDelete(doc.id)}
                       className="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition"
                     >
-                      Xóa
+                      Delete
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-gray-500">Chưa có tài liệu nào được upload.</p>
+            <p className="text-gray-500">No documents uploaded yet.</p>
           )}
         </section>
       </main>
 
-      {/* Modal xem trước tài liệu */}
+      {}
       {isModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
           <div className="bg-white rounded-lg shadow-lg relative max-w-3xl w-full mx-4">
@@ -394,8 +382,6 @@ const DashBoard = () => {
                 <div className="flex justify-center items-center h-96">
                   <ClipLoader color="#123abc" size={50} />
                 </div>
-              ) : docxPreviewHtml ? (
-                <div dangerouslySetInnerHTML={{ __html: docxPreviewHtml }} />
               ) : docPreviewUrl ? (
                 (() => {
                   const ext = docPreviewUrl.split('.').pop().split(/\#|\?/)[0].toLowerCase();
@@ -418,7 +404,7 @@ const DashBoard = () => {
                           </svg>
                         </div>
                         <p className="text-lg font-medium text-gray-700 mb-4">
-                          Không hỗ trợ xem trước cho loại file này
+                          Unsupported file preview
                         </p>
                         <a
                           href={docPreviewUrl}
@@ -426,15 +412,38 @@ const DashBoard = () => {
                           rel="noopener noreferrer"
                           className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
                         >
-                          Tải về file
+                          Download File
                         </a>
                       </div>
                     );
                   }
                 })()
               ) : (
-                <p className="text-center text-gray-600">Không có URL xem trước hợp lệ</p>
+                <p className="text-center text-gray-600">No valid preview URL available</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {}
+      {isOfficeModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+          <div className="bg-white rounded-lg shadow-lg relative max-w-3xl w-full mx-4">
+            <button
+              onClick={() => setIsOfficeModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-3xl"
+            >
+              &times;
+            </button>
+            <div className="p-6">
+              <iframe
+                src={officeEditUrl}
+                width="100%"
+                height="600px"
+                className="rounded"
+                title="Office Editor"
+              ></iframe>
             </div>
           </div>
         </div>

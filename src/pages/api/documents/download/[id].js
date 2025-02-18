@@ -16,7 +16,6 @@ export default async function handler(req, res) {
 
       console.log('🔍 Original fileUrl from DB:', document.fileUrl);
       
-      // document.fileUrl cần phải chứa Key (ví dụ: "uploads/filename.ext") chứ không phải URL đầy đủ
       const downloadUrl = await getS3FileUrl(document.fileUrl);
       console.log('✅ Valid S3 URL:', downloadUrl);
 
