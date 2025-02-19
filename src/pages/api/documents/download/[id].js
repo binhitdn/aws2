@@ -13,12 +13,7 @@ export default async function handler(req, res) {
       if (!document) {
         return res.status(404).json({ message: 'Document not found' });
       }
-
-      console.log('🔍 Original fileUrl from DB:', document.fileUrl);
-      
       const downloadUrl = await getS3FileUrl(document.fileUrl);
-      console.log('✅ Valid S3 URL:', downloadUrl);
-
       res.status(200).json({ downloadUrl });
     } catch (error) {
       console.error('❌ Error generating download URL:', error);
